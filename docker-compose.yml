@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  backend-api:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - STT_SERVICE_URL=http://whisper-stt:8001
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8100
+      - ODOO_URL=http://odoo:8069
+      - ODOO_DB=${ODOO_DB}
+      - ODOO_USER=${ODOO_USER}
+      - ODOO_PASSWORD=${ODOO_PASSWORD}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL=${LLM_MODEL}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL}
+      - PAYMENT_API_KEY=${PAYMENT_API_KEY}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - PRINTER_IP=${PRINTER_IP:-192.168.1.100}
+      - PRINTER_PORT=${PRINTER_PORT:-9100}
+    depends_on:
+      - whisper-stt
+      - chromadb
+      - odoo
+    restart: unless-stopped
+
+  whisper-stt:
+    image: onerahmet/openai-whisper-asr-webservice:latest
+    ports:
+      - "8001:9000"
+    environment:
+      - ASR_MODEL=base
+      - ASR_ENGINE=openai_whisper
+    restart: unless-stopped
+
+  chromadb:
+    image: chromadb/chroma:latest
+    ports:
+      - "8100:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    restart: unless-stopped
+
+  odoo:
+    image: odoo:17.0
+    ports:
+      - "8069:8069"
+    environment:
+      - HOST=postgres
+      - USER=${ODOO_DB_USER:-odoo}
+      - PASSWORD=${ODOO_DB_PASSWORD:-odoo}
+    volumes:
+      - odoo_data:/var/lib/odoo
+      - ./odoo/addons:/mnt/extra-addons
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=${ODOO_DB:-odoo_cashier}
+      - POSTGRES_USER=${ODOO_DB_USER:-odoo}
+      - POSTGRES_PASSWORD=${ODOO_DB_PASSWORD:-odoo}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  chroma_data:
+  odoo_data:
+  postgres_data:
